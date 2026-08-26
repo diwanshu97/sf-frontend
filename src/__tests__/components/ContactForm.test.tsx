@@ -5,6 +5,9 @@ import ContactForm from "@/components/contacts/ContactForm";
 import { makeContact } from "../mocks/handlers";
 import type { FormState } from "@/lib/contacts/types";
 
+const PNG_PHOTO =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
 function renderForm(action: jest.Mock, contact?: ReturnType<typeof makeContact>) {
   return render(
     <ContactForm
@@ -24,6 +27,10 @@ describe("ContactForm", () => {
     expect(screen.getByLabelText(/last name/i)).toBeRequired();
     expect(screen.getByLabelText(/^email/i)).toBeRequired();
     expect(screen.getByLabelText(/phone/i)).not.toBeRequired();
+    expect(screen.getByLabelText(/choose photo/i)).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/png,image/webp",
+    );
     expect(screen.getByLabelText(/notes/i).tagName).toBe("TEXTAREA");
   });
 
@@ -52,6 +59,56 @@ describe("ContactForm", () => {
     const formData = action.mock.calls[0][1];
     expect(formData.get("first_name")).toBe("Grace");
     expect(formData.get("email")).toBe("grace@example.com");
+    expect(formData.get("photo")).toBe("");
+  });
+
+  it("preserves an existing photo through an edit submission", async () => {
+    const action = jest.fn<Promise<FormState>, [FormState, FormData]>(
+      async () => ({ status: "idle" }),
+    );
+    renderForm(action, makeContact({ photo: PNG_PHOTO }));
+
+    expect(
+      screen.getByRole("img", { name: /contact photo preview/i }),
+    ).toHaveAttribute("src", PNG_PHOTO);
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    expect(action.mock.calls[0][1].get("photo")).toBe(PNG_PHOTO);
+  });
+
+  it("converts a selected image to a data URL and can remove it", async () => {
+    const action = jest.fn<Promise<FormState>, [FormState, FormData]>(
+      async () => ({ status: "idle" }),
+    );
+    renderForm(action, makeContact());
+    const image = new File(
+      [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])],
+      "avatar.png",
+      { type: "image/png" },
+    );
+
+    await userEvent.upload(screen.getByLabelText(/choose photo/i), image);
+    expect(
+      await screen.findByRole("img", { name: /contact photo preview/i }),
+    ).toHaveAttribute("src", expect.stringMatching(/^data:image\/png;base64,/));
+
+    await userEvent.click(screen.getByRole("button", { name: /remove/i }));
+    expect(
+      screen.queryByRole("img", { name: /contact photo preview/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("rejects files larger than 2 MiB before submission", async () => {
+    renderForm(jest.fn(), makeContact());
+    const image = new File(["x"], "large.png", { type: "image/png" });
+    Object.defineProperty(image, "size", { value: 2 * 1024 * 1024 + 1 });
+
+    await userEvent.upload(screen.getByLabelText(/choose photo/i), image);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Choose an image no larger than 2 MiB.",
+    );
   });
 
   it("shows the summary and the per-field errors the action returns", async () => {
