@@ -1,6 +1,19 @@
 import { z } from "zod";
 import type { ContactInput } from "./types";
 
+export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+export const PHOTO_ACCEPTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+export const PHOTO_ACCEPT = PHOTO_ACCEPTED_TYPES.join(",");
+
+const PHOTO_MAX_DATA_URL_LENGTH =
+  "data:image/jpeg;base64,".length + 4 * Math.ceil(PHOTO_MAX_BYTES / 3);
+const PHOTO_DATA_URL_PATTERN =
+  /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]*={0,2}$/;
+
 /**
  * Client/server-shared validation for the contact form.
  *
@@ -39,6 +52,16 @@ export const contactInputSchema = z.object({
     .pipe(z.email("Enter a valid email address"))
     .transform((value) => value.toLowerCase()),
   phone: optionalText(40, "Phone"),
+  photo: z
+    .string()
+    .max(PHOTO_MAX_DATA_URL_LENGTH, "Photo must be 2 MiB or smaller")
+    .refine(
+      (value) => value === "" || PHOTO_DATA_URL_PATTERN.test(value),
+      "Photo must be a JPEG, PNG, or WebP image",
+    )
+    .transform((value) => value || null)
+    .nullable()
+    .default(null),
   company: optionalText(200, "Company"),
   job_title: optionalText(200, "Job title"),
   address: optionalText(300, "Address"),
@@ -217,11 +240,15 @@ export const CONTACT_FIELDS: ContactFieldSpec[] = CONTACT_FIELD_GROUPS.flatMap(
 /** Pull the contact fields out of a submitted form, as raw strings. */
 export function formDataToValues(
   formData: FormData,
+  photoValue = String(formData.get("photo") ?? ""),
 ): Record<keyof ContactInput, string> {
   return Object.fromEntries(
-    CONTACT_FIELDS.map((field) => [
-      field.name,
-      String(formData.get(field.name) ?? ""),
-    ]),
+    [
+      ...CONTACT_FIELDS.map((field) => [
+        field.name,
+        String(formData.get(field.name) ?? ""),
+      ]),
+      ["photo", photoValue],
+    ],
   ) as Record<keyof ContactInput, string>;
 }

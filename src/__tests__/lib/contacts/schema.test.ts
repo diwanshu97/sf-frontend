@@ -11,6 +11,7 @@ function values(overrides: Record<string, string> = {}) {
     last_name: "Lovelace",
     email: "Ada@Example.com",
     phone: "",
+    photo: "",
     company: "",
     job_title: "",
     address: "",
@@ -29,6 +30,7 @@ describe("contactInputSchema", () => {
 
     expect(parsed.email).toBe("ada@example.com");
     expect(parsed.phone).toBeNull();
+    expect(parsed.photo).toBeNull();
     expect(parsed.notes).toBeNull();
   });
 
@@ -66,6 +68,18 @@ describe("contactInputSchema", () => {
       postal_code: "Postal code must be 20 characters or fewer",
     });
   });
+
+  it("accepts supported image data URLs and rejects other content", () => {
+    const png = "data:image/png;base64,iVBORw0KGgo=";
+    expect(contactInputSchema.parse(values({ photo: png })).photo).toBe(png);
+
+    const result = contactInputSchema.safeParse(
+      values({ photo: "data:image/svg+xml;base64,PHN2Zz4=" }),
+    );
+    expect(zodFieldErrors(result.error!).photo).toBe(
+      "Photo must be a JPEG, PNG, or WebP image",
+    );
+  });
 });
 
 describe("formDataToValues", () => {
@@ -79,8 +93,16 @@ describe("formDataToValues", () => {
 
     expect(extracted.first_name).toBe("Grace");
     expect(extracted.last_name).toBe("");
+    expect(extracted.photo).toBe("");
     expect(Object.keys(extracted).sort()).toEqual(
-      CONTACT_FIELDS.map((field) => field.name).sort(),
+      [...CONTACT_FIELDS.map((field) => field.name), "photo"].sort(),
     );
+  });
+
+  it("accepts a server-converted photo value", () => {
+    const formData = new FormData();
+    const photo = "data:image/png;base64,iVBORw0KGgo=";
+
+    expect(formDataToValues(formData, photo).photo).toBe(photo);
   });
 });

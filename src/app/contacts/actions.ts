@@ -15,6 +15,7 @@ import {
   formDataToValues,
   zodFieldErrors,
 } from "@/lib/contacts/schema";
+import { photoValueFromFormData } from "@/lib/contacts/photoUpload";
 import type { Contact, FormState } from "@/lib/contacts/types";
 
 /** Mutations for the contacts UI. Every one of these runs only on the server. */
@@ -38,7 +39,17 @@ export async function saveContactAction(
   _prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const values = formDataToValues(formData);
+  const photo = await photoValueFromFormData(formData);
+  const values = formDataToValues(formData, photo.value);
+
+  if (photo.error) {
+    return {
+      status: "error",
+      message: "Please fix the highlighted fields.",
+      fieldErrors: { photo: photo.error },
+      values,
+    };
+  }
 
   const parsed = contactInputSchema.safeParse(values);
   if (!parsed.success) {
