@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Camera, Trash2, Upload } from "lucide-react";
-import { useId, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import Button, { buttonClasses } from "@/components/ui/Button";
 import {
   PHOTO_ACCEPT,
@@ -15,17 +15,35 @@ const PHOTO_MAX_LABEL = "2 MiB";
 export default function ContactPhotoField({
   initialPhoto,
   error,
+  onReadingChange,
 }: {
   initialPhoto: string | null;
   error?: string;
+  onReadingChange: (reading: boolean) => void;
 }) {
   const inputId = useId();
   const helpId = `${inputId}-help`;
   const errorId = `${inputId}-error`;
   const fileInput = useRef<HTMLInputElement>(null);
+  const activeReader = useRef<FileReader | undefined>(undefined);
+  const readVersion = useRef(0);
   const [photo, setPhoto] = useState(initialPhoto);
   const [localError, setLocalError] = useState<string>();
+  const [isReading, setIsReading] = useState(false);
   const message = localError ?? error;
+
+  useEffect(
+    () => () => {
+      readVersion.current += 1;
+      activeReader.current?.abort();
+    },
+    [],
+  );
+
+  function updateReading(reading: boolean) {
+    setIsReading(reading);
+    onReadingChange(reading);
+  }
 
   function resetFileInput() {
     if (fileInput.current) fileInput.current.value = "";
@@ -34,6 +52,11 @@ export default function ContactPhotoField({
   function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    const version = ++readVersion.current;
+    activeReader.current?.abort();
+    activeReader.current = undefined;
+    updateReading(false);
 
     if (!(PHOTO_ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
       setLocalError("Choose a JPEG, PNG, or WebP image.");
@@ -47,30 +70,45 @@ export default function ContactPhotoField({
     }
 
     const reader = new FileReader();
+    activeReader.current = reader;
+    updateReading(true);
     reader.onload = () => {
+      if (version !== readVersion.current) return;
       if (typeof reader.result !== "string") {
         setLocalError("That image could not be read. Choose another file.");
+        activeReader.current = undefined;
+        updateReading(false);
+        resetFileInput();
         return;
       }
       setPhoto(reader.result);
       setLocalError(undefined);
+      activeReader.current = undefined;
+      updateReading(false);
       resetFileInput();
     };
     reader.onerror = () => {
+      if (version !== readVersion.current) return;
       setLocalError("That image could not be read. Choose another file.");
+      activeReader.current = undefined;
+      updateReading(false);
       resetFileInput();
     };
     reader.readAsDataURL(file);
   }
 
   function removePhoto() {
+    readVersion.current += 1;
+    activeReader.current?.abort();
+    activeReader.current = undefined;
+    updateReading(false);
     setPhoto(null);
     setLocalError(undefined);
     resetFileInput();
   }
 
   return (
-    <fieldset className="space-y-4">
+    <fieldset className="space-y-4" aria-busy={isReading || undefined}>
       <legend className="sr-only">Photo</legend>
 
       <div className="border-b border-hairline pb-2">
@@ -110,6 +148,7 @@ export default function ContactPhotoField({
             <input
               ref={fileInput}
               id={inputId}
+              name="photo_file"
               type="file"
               accept={PHOTO_ACCEPT}
               onChange={choosePhoto}
@@ -129,6 +168,11 @@ export default function ContactPhotoField({
           {message ? (
             <p id={errorId} role="alert" className="text-[13px] text-destructive">
               {message}
+            </p>
+          ) : null}
+          {isReading ? (
+            <p className="text-[13px] text-muted-foreground" role="status">
+              Preparing photo…
             </p>
           ) : null}
         </div>

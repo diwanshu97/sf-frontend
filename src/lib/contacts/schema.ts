@@ -240,6 +240,7 @@ export const CONTACT_FIELDS: ContactFieldSpec[] = CONTACT_FIELD_GROUPS.flatMap(
 /** Pull the contact fields out of a submitted form, as raw strings. */
 export function formDataToValues(
   formData: FormData,
+  photoValue = String(formData.get("photo") ?? ""),
 ): Record<keyof ContactInput, string> {
   return Object.fromEntries(
     [
@@ -247,7 +248,7 @@ export function formDataToValues(
         field.name,
         String(formData.get(field.name) ?? ""),
       ]),
-      ["photo", String(formData.get("photo") ?? "")],
+      ["photo", photoValue],
     ],
   ) as Record<keyof ContactInput, string>;
 }

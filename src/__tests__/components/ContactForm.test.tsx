@@ -31,6 +31,10 @@ describe("ContactForm", () => {
       "accept",
       "image/jpeg,image/png,image/webp",
     );
+    expect(screen.getByLabelText(/choose photo/i)).toHaveAttribute(
+      "name",
+      "photo_file",
+    );
     expect(screen.getByLabelText(/notes/i).tagName).toBe("TEXTAREA");
   });
 
@@ -109,6 +113,20 @@ describe("ContactForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Choose an image no larger than 2 MiB.",
     );
+  });
+
+  it("disables submission while the selected photo is being read", async () => {
+    const read = jest
+      .spyOn(FileReader.prototype, "readAsDataURL")
+      .mockImplementation(() => undefined);
+    renderForm(jest.fn(), makeContact());
+    const image = new File(["image"], "avatar.png", { type: "image/png" });
+
+    await userEvent.upload(screen.getByLabelText(/choose photo/i), image);
+
+    expect(screen.getByRole("button", { name: /preparing photo/i })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Preparing photo…");
+    read.mockRestore();
   });
 
   it("shows the summary and the per-field errors the action returns", async () => {

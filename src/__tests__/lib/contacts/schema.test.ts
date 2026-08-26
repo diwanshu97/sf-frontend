@@ -98,4 +98,11 @@ describe("formDataToValues", () => {
       [...CONTACT_FIELDS.map((field) => field.name), "photo"].sort(),
     );
   });
+
+  it("accepts a server-converted photo value", () => {
+    const formData = new FormData();
+    const photo = "data:image/png;base64,iVBORw0KGgo=";
+
+    expect(formDataToValues(formData, photo).photo).toBe(photo);
+  });
 });
