@@ -12,7 +12,11 @@ export const metadata: Metadata = {
 const GALAXY_LIMIT = 18;
 
 export default async function NetworkPage() {
-  const outcome = await listContacts({ limit: GALAXY_LIMIT }).catch(
+  const outcome = await listContacts({
+    limit: GALAXY_LIMIT,
+    sortBy: "id",
+    order: "asc",
+  }).catch(
     (error: unknown) => error as Error,
   );
 
