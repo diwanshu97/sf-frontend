@@ -24,10 +24,23 @@ export default function ContactGalaxy({
   total: number;
 }) {
   const [mode, setMode] = useState<GalaxyMode>("location");
+  const [activeContactId, setActiveContactId] = useState<number | null>(null);
   const positions = galaxyPositions(contacts);
   const connections = galaxyConnections(contacts, mode);
   const connectionNoun = connections.length === 1 ? "connection" : "connections";
   const modePlural = mode === "company" ? "companies" : "locations";
+  const reasonsFor = (contactId: number) => [
+    ...new Set(
+      connections
+        .filter(
+          (connection) =>
+            connection.sourceId === contactId || connection.targetId === contactId,
+        )
+        .map((connection) => connection.label),
+    ),
+  ];
+  const activeContact = contacts.find((contact) => contact.id === activeContactId);
+  const activeReasons = activeContact ? reasonsFor(activeContact.id) : [];
 
   return (
     <div className="space-y-4">
@@ -66,7 +79,38 @@ export default function ContactGalaxy({
         </div>
       </div>
 
-      <div className="relative min-h-[31rem] overflow-hidden rounded-xl border border-border bg-card">
+      <section
+        aria-label="Compact network"
+        className="grid gap-3 sm:grid-cols-2 lg:hidden"
+      >
+        {contacts.map((contact) => {
+          const reasons = reasonsFor(contact.id);
+          return (
+            <Link
+              key={contact.id}
+              href={`/contacts/${contact.id}`}
+              className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/50 hover:bg-secondary/40 focus-visible:border-primary"
+            >
+              <ContactAvatar contact={contact} size="md" />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-foreground">
+                  {contact.full_name}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {reasons.length
+                    ? `Connected through ${reasons.join(", ")}`
+                    : `No shared ${mode} yet`}
+                </span>
+              </span>
+            </Link>
+          );
+        })}
+      </section>
+
+      <section
+        aria-label="Galaxy map"
+        className="relative hidden min-h-[31rem] overflow-hidden rounded-xl border border-border bg-card lg:block"
+      >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgb(var(--primary)/0.10),transparent_55%)]" />
         {[12, 28, 44, 63, 78, 91].map((left, index) => (
           <span
@@ -110,35 +154,57 @@ export default function ContactGalaxy({
 
         {contacts.map((contact) => {
           const point = positions.get(contact.id)!;
-          const reasons = connections
-            .filter(
-              (connection) =>
-                connection.sourceId === contact.id || connection.targetId === contact.id,
-            )
-            .map((connection) => connection.label);
+          const reasons = reasonsFor(contact.id);
+          const relationship = reasons.length
+            ? `Connected through ${reasons.join(", ")}`
+            : `No shared ${mode} yet`;
 
           return (
             <Link
               key={contact.id}
               href={`/contacts/${contact.id}`}
-              aria-label={`Open ${contact.full_name}`}
+              aria-label={`Open ${contact.full_name}. ${relationship}`}
+              onMouseEnter={() => setActiveContactId(contact.id)}
+              onMouseLeave={() => setActiveContactId(null)}
+              onFocus={() => setActiveContactId(contact.id)}
+              onBlur={() => setActiveContactId(null)}
               className="group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
               style={{ left: `${point.x}%`, top: `${(point.y / 62) * 100}%` }}
             >
               <span className="rounded-full border-2 border-primary/50 bg-background p-1 shadow-[0_0_28px_rgb(var(--primary)/0.25)] transition-transform group-hover:scale-110 group-focus-visible:scale-110">
-                <ContactAvatar contact={contact} size="lg" />
+                <ContactAvatar contact={contact} size="md" />
               </span>
-              <span className="mt-2 max-w-32 truncate rounded-full border border-border bg-background/95 px-2.5 py-1 text-center text-xs font-medium text-foreground shadow-sm">
+              <span className="mt-2 max-w-24 truncate rounded-full border border-border bg-background/95 px-2 py-1 text-center text-[11px] font-medium text-foreground shadow-sm">
                 {contact.full_name}
-              </span>
-              <span className="pointer-events-none absolute top-full mt-2 hidden w-44 rounded-md border border-border bg-popover px-3 py-2 text-center text-[11px] text-muted-foreground shadow-lg group-hover:block group-focus-visible:block">
-                {reasons.length
-                  ? `Connected through ${[...new Set(reasons)].join(", ")}`
-                  : `No shared ${mode} yet`}
               </span>
             </Link>
           );
         })}
+
+        <div
+          aria-live="polite"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-20 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-background/95 px-4 py-3 text-center shadow-lg backdrop-blur"
+        >
+          {activeContact ? (
+            <>
+              <p className="truncate text-sm font-semibold text-foreground">
+                {activeContact.full_name}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {activeReasons.length
+                  ? `Connected through ${activeReasons.join(", ")}`
+                  : `No shared ${mode} yet`}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-foreground">Explore a connection</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Hover or focus a person to reveal why they are connected.
+              </p>
+            </>
+          )}
+        </div>
 
         {connections.length === 0 && contacts.length > 1 ? (
           <p className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-border bg-background/90 px-4 py-2 text-xs text-muted-foreground">
@@ -157,7 +223,7 @@ export default function ContactGalaxy({
             );
           })}
         </ul>
-      </div>
+      </section>
     </div>
   );
 }

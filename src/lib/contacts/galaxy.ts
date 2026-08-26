@@ -14,7 +14,7 @@ export interface GalaxyPoint {
 }
 
 function normalized(value: string | null | undefined): string {
-  return value?.trim().toLocaleLowerCase() ?? "";
+  return value?.trim().toLowerCase() ?? "";
 }
 
 function displayValue(

@@ -13,6 +13,15 @@ describe("galaxyConnections", () => {
     ]);
   });
 
+  it("normalizes relationship values without depending on the runtime locale", () => {
+    const contacts = [
+      makeContact({ id: 1, company: "INDIGO" }),
+      makeContact({ id: 2, company: "indigo" }),
+    ];
+
+    expect(galaxyConnections(contacts, "company")).toHaveLength(1);
+  });
+
   it("uses the most specific shared address value", () => {
     const contacts = [
       makeContact({
