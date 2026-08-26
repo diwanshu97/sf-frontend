@@ -84,6 +84,30 @@ describe("ContactForm", () => {
     expect(formData.get("addresses.1.type")).toBeNull();
   });
 
+  it("preserves edited address values when an action returns an error", async () => {
+    const action = jest.fn(
+      async (): Promise<FormState> => ({
+        status: "error",
+        message: "Please fix the highlighted fields.",
+        fieldErrors: { email: "Email is required" },
+      }),
+    );
+    renderForm(action, makeContact());
+
+    const street = screen.getByLabelText(/street address/i);
+    const city = screen.getByLabelText(/^city$/i);
+    await userEvent.type(street, "55 Error-Proof Ave");
+    await userEvent.clear(city);
+    await userEvent.type(city, "Oakland");
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+
+    await screen.findByText("Please fix the highlighted fields.");
+    expect(screen.getByLabelText(/street address/i)).toHaveValue(
+      "55 Error-Proof Ave",
+    );
+    expect(screen.getByLabelText(/^city$/i)).toHaveValue("Oakland");
+  });
+
   it("submits the entered values to the action", async () => {
     const action = jest.fn<Promise<FormState>, [FormState, FormData]>(
       async () => ({ status: "idle" }),

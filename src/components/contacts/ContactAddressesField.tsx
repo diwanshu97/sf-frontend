@@ -44,6 +44,7 @@ function AddressControl({
   maxLength,
   placeholder,
   error,
+  onChange,
 }: {
   index: number;
   field: Exclude<keyof AddressInput, "type">;
@@ -52,6 +53,7 @@ function AddressControl({
   maxLength: number;
   placeholder: string;
   error?: string;
+  onChange: (value: string) => void;
 }) {
   const id = `address-${index}-${field}`;
   const errorId = `${id}-error`;
@@ -63,7 +65,8 @@ function AddressControl({
       <input
         id={id}
         name={`addresses.${index}.${field}`}
-        defaultValue={value}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
         maxLength={maxLength}
         placeholder={placeholder}
         aria-invalid={error ? true : undefined}
@@ -100,6 +103,18 @@ export default function ContactAddressesField({
 
   function removeAddress(key: string) {
     setAddresses((current) => current.filter((address) => address.key !== key));
+  }
+
+  function updateAddress<K extends keyof AddressFormValues>(
+    key: string,
+    field: K,
+    value: AddressFormValues[K],
+  ) {
+    setAddresses((current) =>
+      current.map((address) =>
+        address.key === key ? { ...address, [field]: value } : address,
+      ),
+    );
   }
 
   return (
@@ -154,8 +169,23 @@ export default function ContactAddressesField({
                     <select
                       id={`address-${index}-type`}
                       name={`addresses.${index}.type`}
-                      defaultValue={address.type}
-                      className={`${INPUT} min-w-32`}
+                      value={address.type}
+                      onChange={(event) =>
+                        updateAddress(
+                          address.key,
+                          "type",
+                          event.target.value as AddressFormValues["type"],
+                        )
+                      }
+                      aria-invalid={fieldErrors?.[`${prefix}.type`] ? true : undefined}
+                      aria-describedby={
+                        fieldErrors?.[`${prefix}.type`]
+                          ? `address-${index}-type-error`
+                          : undefined
+                      }
+                      className={`${INPUT} min-w-32 ${
+                        fieldErrors?.[`${prefix}.type`] ? "border-destructive" : ""
+                      }`}
                     >
                       {ADDRESS_TYPES.map((type) => (
                         <option key={type} value={type}>
@@ -163,6 +193,15 @@ export default function ContactAddressesField({
                         </option>
                       ))}
                     </select>
+                    {fieldErrors?.[`${prefix}.type`] ? (
+                      <p
+                        id={`address-${index}-type-error`}
+                        role="alert"
+                        className="mt-1.5 text-[13px] text-destructive"
+                      >
+                        {fieldErrors[`${prefix}.type`]}
+                      </p>
+                    ) : null}
                   </div>
                   <Button
                     type="button"
@@ -185,6 +224,7 @@ export default function ContactAddressesField({
                     maxLength={300}
                     placeholder="1 Market St, Suite 400"
                     error={fieldErrors?.[`${prefix}.street`] ?? fieldErrors?.[prefix]}
+                    onChange={(value) => updateAddress(address.key, "street", value)}
                   />
                   <AddressControl
                     index={index}
@@ -194,6 +234,7 @@ export default function ContactAddressesField({
                     maxLength={120}
                     placeholder="San Francisco"
                     error={fieldErrors?.[`${prefix}.city`]}
+                    onChange={(value) => updateAddress(address.key, "city", value)}
                   />
                   <AddressControl
                     index={index}
@@ -203,6 +244,7 @@ export default function ContactAddressesField({
                     maxLength={120}
                     placeholder="CA"
                     error={fieldErrors?.[`${prefix}.state`]}
+                    onChange={(value) => updateAddress(address.key, "state", value)}
                   />
                   <AddressControl
                     index={index}
@@ -212,6 +254,7 @@ export default function ContactAddressesField({
                     maxLength={20}
                     placeholder="94105"
                     error={fieldErrors?.[`${prefix}.postal_code`]}
+                    onChange={(value) => updateAddress(address.key, "postal_code", value)}
                   />
                   <AddressControl
                     index={index}
@@ -221,6 +264,7 @@ export default function ContactAddressesField({
                     maxLength={120}
                     placeholder="USA"
                     error={fieldErrors?.[`${prefix}.country`]}
+                    onChange={(value) => updateAddress(address.key, "country", value)}
                   />
                 </div>
               </div>
