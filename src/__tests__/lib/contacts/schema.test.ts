@@ -5,7 +5,7 @@ import {
   zodFieldErrors,
 } from "@/lib/contacts/schema";
 
-function values(overrides: Record<string, string> = {}) {
+function values(overrides: Record<string, unknown> = {}) {
   return {
     first_name: "Ada",
     last_name: "Lovelace",
@@ -14,11 +14,7 @@ function values(overrides: Record<string, string> = {}) {
     photo: "",
     company: "",
     job_title: "",
-    address: "",
-    city: "",
-    state: "",
-    postal_code: "",
-    country: "",
+    addresses: [],
     notes: "",
     ...overrides,
   };
@@ -60,13 +56,87 @@ describe("contactInputSchema", () => {
 
   it("enforces the API's length limits", () => {
     const result = contactInputSchema.safeParse(
-      values({ first_name: "a".repeat(101), postal_code: "9".repeat(21) }),
+      values({
+        first_name: "a".repeat(101),
+        addresses: [
+          {
+            type: "Home",
+            street: "",
+            city: "",
+            state: "",
+            postal_code: "9".repeat(21),
+            country: "",
+          },
+        ],
+      }),
     );
 
     expect(zodFieldErrors(result.error!)).toEqual({
       first_name: "First name must be 100 characters or fewer",
-      postal_code: "Postal code must be 20 characters or fewer",
+      "addresses.0.postal_code": "Postal code must be 20 characters or fewer",
     });
+  });
+
+  it("normalizes multiple typed addresses", () => {
+    const parsed = contactInputSchema.parse(
+      values({
+        addresses: [
+          {
+            type: "Home",
+            street: "  1 Main St  ",
+            city: "",
+            state: "CA",
+            postal_code: "",
+            country: "USA",
+          },
+          {
+            type: "Work",
+            street: "",
+            city: "  London ",
+            state: "",
+            postal_code: "",
+            country: "UK",
+          },
+        ],
+      }),
+    );
+
+    expect(parsed.addresses).toEqual([
+      {
+        type: "Home",
+        street: "1 Main St",
+        city: null,
+        state: "CA",
+        postal_code: null,
+        country: "USA",
+      },
+      {
+        type: "Work",
+        street: null,
+        city: "London",
+        state: null,
+        postal_code: null,
+        country: "UK",
+      },
+    ]);
+  });
+
+  it("rejects an empty address and unsupported type", () => {
+    const empty = contactInputSchema.safeParse(
+      values({
+        addresses: [
+          { type: "Home", street: "", city: "", state: "", postal_code: "", country: "" },
+        ],
+      }),
+    );
+    expect(zodFieldErrors(empty.error!)["addresses.0.street"]).toBe(
+      "Enter at least one address field",
+    );
+
+    const invalidType = contactInputSchema.safeParse(
+      values({ addresses: [{ type: "Vacation", city: "Paris" }] }),
+    );
+    expect(zodFieldErrors(invalidType.error!)["addresses.0.type"]).toBeDefined();
   });
 
   it("accepts supported image data URLs and rejects other content", () => {
@@ -83,10 +153,15 @@ describe("contactInputSchema", () => {
 });
 
 describe("formDataToValues", () => {
-  it("pulls every known field out, defaulting to an empty string", () => {
+  it("pulls scalar fields and an indexed address collection", () => {
     const formData = new FormData();
     formData.set("first_name", "Grace");
     formData.set("email", "grace@example.com");
+    formData.set("address_count", "2");
+    formData.set("addresses.0.type", "Home");
+    formData.set("addresses.0.city", "Arlington");
+    formData.set("addresses.1.type", "Work");
+    formData.set("addresses.1.street", "1 Navy Way");
     formData.set("ignored", "nope");
 
     const extracted = formDataToValues(formData);
@@ -94,8 +169,26 @@ describe("formDataToValues", () => {
     expect(extracted.first_name).toBe("Grace");
     expect(extracted.last_name).toBe("");
     expect(extracted.photo).toBe("");
+    expect(extracted.addresses).toEqual([
+      {
+        type: "Home",
+        street: "",
+        city: "Arlington",
+        state: "",
+        postal_code: "",
+        country: "",
+      },
+      {
+        type: "Work",
+        street: "1 Navy Way",
+        city: "",
+        state: "",
+        postal_code: "",
+        country: "",
+      },
+    ]);
     expect(Object.keys(extracted).sort()).toEqual(
-      [...CONTACT_FIELDS.map((field) => field.name), "photo"].sort(),
+      [...CONTACT_FIELDS.map((field) => field.name), "photo", "addresses"].sort(),
     );
   });
 

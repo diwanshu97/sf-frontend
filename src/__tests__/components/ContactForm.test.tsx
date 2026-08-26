@@ -20,7 +20,7 @@ function renderForm(action: jest.Mock, contact?: ReturnType<typeof makeContact>)
 }
 
 describe("ContactForm", () => {
-  it("renders every editable field", () => {
+  it("renders scalar fields and the empty address editor", () => {
     renderForm(jest.fn());
 
     expect(screen.getByLabelText(/first name/i)).toBeRequired();
@@ -36,6 +36,8 @@ describe("ContactForm", () => {
       "photo_file",
     );
     expect(screen.getByLabelText(/notes/i).tagName).toBe("TEXTAREA");
+    expect(screen.getByText("No addresses added.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add address/i })).toBeEnabled();
   });
 
   it("prefills from an existing contact", () => {
@@ -45,6 +47,65 @@ describe("ContactForm", () => {
     expect(screen.getByLabelText(/^email/i)).toHaveValue("ada@example.com");
     // Nulls become empty inputs rather than the string "null".
     expect(screen.getByLabelText(/street address/i)).toHaveValue("");
+    expect(screen.getByLabelText(/city/i)).toHaveValue("San Francisco");
+    expect(screen.getByLabelText(/address type/i)).toHaveValue("Home");
+  });
+
+  it("adds, removes, and submits indexed typed addresses", async () => {
+    const action = jest.fn<Promise<FormState>, [FormState, FormData]>(
+      async () => ({ status: "idle" }),
+    );
+    renderForm(action);
+
+    await userEvent.click(screen.getByRole("button", { name: /add address/i }));
+    await userEvent.type(screen.getByLabelText(/street address/i), "10 Main St");
+    await userEvent.click(screen.getByRole("button", { name: /add address/i }));
+
+    const types = screen.getAllByLabelText(/address type/i);
+    const cities = screen.getAllByLabelText(/^city$/i);
+    await userEvent.selectOptions(types[1], "Work");
+    await userEvent.type(cities[1], "New York");
+
+    await userEvent.click(screen.getByRole("button", { name: /remove address 1/i }));
+    expect(screen.getAllByLabelText(/address type/i)).toHaveLength(1);
+    expect(screen.getByLabelText(/address type/i)).toHaveValue("Work");
+    expect(screen.getByLabelText(/^city$/i)).toHaveValue("New York");
+
+    await userEvent.type(screen.getByLabelText(/first name/i), "Grace");
+    await userEvent.type(screen.getByLabelText(/last name/i), "Hopper");
+    await userEvent.type(screen.getByLabelText(/^email/i), "grace@example.com");
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    const formData = action.mock.calls[0][1];
+    expect(formData.get("address_count")).toBe("1");
+    expect(formData.get("addresses.0.type")).toBe("Work");
+    expect(formData.get("addresses.0.city")).toBe("New York");
+    expect(formData.get("addresses.1.type")).toBeNull();
+  });
+
+  it("preserves edited address values when an action returns an error", async () => {
+    const action = jest.fn(
+      async (): Promise<FormState> => ({
+        status: "error",
+        message: "Please fix the highlighted fields.",
+        fieldErrors: { email: "Email is required" },
+      }),
+    );
+    renderForm(action, makeContact());
+
+    const street = screen.getByLabelText(/street address/i);
+    const city = screen.getByLabelText(/^city$/i);
+    await userEvent.type(street, "55 Error-Proof Ave");
+    await userEvent.clear(city);
+    await userEvent.type(city, "Oakland");
+    await userEvent.click(screen.getByRole("button", { name: /create contact/i }));
+
+    await screen.findByText("Please fix the highlighted fields.");
+    expect(screen.getByLabelText(/street address/i)).toHaveValue(
+      "55 Error-Proof Ave",
+    );
+    expect(screen.getByLabelText(/^city$/i)).toHaveValue("Oakland");
   });
 
   it("submits the entered values to the action", async () => {
@@ -97,7 +158,7 @@ describe("ContactForm", () => {
       await screen.findByRole("img", { name: /contact photo preview/i }),
     ).toHaveAttribute("src", expect.stringMatching(/^data:image\/png;base64,/));
 
-    await userEvent.click(screen.getByRole("button", { name: /remove/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^remove$/i }));
     expect(
       screen.queryByRole("img", { name: /contact photo preview/i }),
     ).not.toBeInTheDocument();

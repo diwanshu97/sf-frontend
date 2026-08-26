@@ -4,6 +4,22 @@
  */
 
 /** `ContactRead` — a stored contact, as returned by every contact endpoint. */
+export const ADDRESS_TYPES = ["Home", "Work", "Other"] as const;
+export type AddressType = (typeof ADDRESS_TYPES)[number];
+
+export interface AddressInput {
+  type: AddressType;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
+}
+
+export interface Address extends AddressInput {
+  id: number;
+}
+
 export interface Contact {
   id: number;
   first_name: string;
@@ -13,11 +29,7 @@ export interface Contact {
   photo: string | null;
   company: string | null;
   job_title: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  postal_code: string | null;
-  country: string | null;
+  addresses: Address[];
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -27,8 +39,16 @@ export interface Contact {
 /** Every editable field, i.e. `ContactCreate` / `ContactReplace`. */
 export type ContactInput = Omit<
   Contact,
-  "id" | "created_at" | "updated_at" | "full_name"
->;
+  "id" | "addresses" | "created_at" | "updated_at" | "full_name"
+> & { addresses: AddressInput[] };
+
+export type ContactTextInputKey = Exclude<keyof ContactInput, "addresses">;
+export type AddressFormValues = Record<Exclude<keyof AddressInput, "type">, string> & {
+  type: AddressType;
+};
+export type ContactFormStateValues = Partial<Record<ContactTextInputKey, string>> & {
+  addresses?: AddressFormValues[];
+};
 
 /** `ContactPage` — one page of contacts plus the totals needed to paginate. */
 export interface ContactPage {
@@ -75,9 +95,9 @@ export type FormState = {
   /** Message shown above the form; used for API-level failures. */
   message?: string;
   /** Per-field messages keyed by input name. */
-  fieldErrors?: Partial<Record<keyof ContactInput, string>>;
+  fieldErrors?: Record<string, string>;
   /** Echo of the submitted values so the form survives a failed round trip. */
-  values?: Partial<Record<keyof ContactInput, string>>;
+  values?: ContactFormStateValues;
 };
 
 export const EMPTY_FORM_STATE: FormState = { status: "idle" };
