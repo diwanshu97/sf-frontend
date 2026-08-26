@@ -38,6 +38,10 @@ describe("AppShell", () => {
       "href",
       "/contacts/new",
     );
+    expect(screen.getByRole("link", { name: "Galaxy" })).toHaveAttribute(
+      "href",
+      "/network",
+    );
     expect(screen.getByText("page body")).toBeInTheDocument();
     expect(screen.getByRole("contentinfo")).toHaveTextContent(/^web v/);
   });
@@ -75,6 +79,19 @@ describe("AppShell", () => {
     mockPathname.mockReturnValue("/contacts/new/");
     renderShell();
     expect(screen.getByRole("link", { name: "New contact" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "Contacts" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("switches the active link on the galaxy route", () => {
+    mockPathname.mockReturnValue("/network/");
+    renderShell();
+
+    expect(screen.getByRole("link", { name: "Galaxy" })).toHaveAttribute(
       "aria-current",
       "page",
     );
