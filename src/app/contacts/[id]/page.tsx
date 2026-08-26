@@ -8,6 +8,7 @@ import DeleteContactButton from "@/components/contacts/DeleteContactButton";
 import { buttonClasses } from "@/components/ui/Button";
 import { getContact } from "@/lib/contacts/api";
 import { addressLine, formatTimestamp, jobLine } from "@/lib/contacts/format";
+import { ADDRESS_TYPES } from "@/lib/contacts/types";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -43,8 +44,6 @@ export default async function ContactDetailPage({ params }: PageProps) {
   if (!contact) notFound();
 
   const subtitle = jobLine(contact);
-  const address = addressLine(contact);
-
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
       <Link
@@ -102,7 +101,33 @@ export default async function ContactDetailPage({ params }: PageProps) {
         </Row>
         <Row label="Company">{contact.company}</Row>
         <Row label="Job title">{contact.job_title}</Row>
-        <Row label="Address">{address}</Row>
+        <Row label="Addresses">
+          {contact.addresses.length ? (
+            <div className="space-y-4">
+              {ADDRESS_TYPES.map((type) => {
+                const addresses = contact.addresses.filter(
+                  (address) => address.type === type,
+                );
+                if (!addresses.length) return null;
+
+                return (
+                  <section key={type} aria-label={`${type} addresses`}>
+                    <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {type}
+                    </h2>
+                    <div className="space-y-1.5">
+                      {addresses.map((address) => (
+                        <address key={address.id} className="not-italic">
+                          {addressLine(address)}
+                        </address>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          ) : null}
+        </Row>
         <Row label="Notes">
           {contact.notes ? (
             <span className="whitespace-pre-wrap">{contact.notes}</span>
