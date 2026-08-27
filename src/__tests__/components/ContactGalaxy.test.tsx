@@ -83,5 +83,21 @@ describe("ContactGalaxy", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     fireEvent.focus(edge);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    expect(edge).toHaveClass("focus-visible:stroke-primary/20");
+  });
+
+  it("keeps edge labels inside the galaxy at boundary positions", () => {
+    const contacts = Array.from({ length: 18 }, (_, index) =>
+      makeContact({
+        id: index + 1,
+        full_name: `Person ${index + 1} Example`,
+        email: `edge-${index + 1}@example.com`,
+      }),
+    );
+    render(<ContactGalaxy contacts={contacts} total={contacts.length} />);
+
+    fireEvent.mouseEnter(screen.getByTestId("galaxy-edge-5-6"));
+
+    expect(screen.getByRole("tooltip")).toHaveStyle({ left: "82%" });
   });
 });

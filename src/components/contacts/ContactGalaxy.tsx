@@ -21,6 +21,10 @@ function connectionKey(connection: GalaxyConnection): string {
   return `${connection.sourceId}-${connection.targetId}`;
 }
 
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
 export default function ContactGalaxy({
   contacts,
   total,
@@ -56,6 +60,29 @@ export default function ContactGalaxy({
   const activeConnectionTarget = activeConnection
     ? contacts.find((contact) => contact.id === activeConnection.targetId)
     : undefined;
+  const activeConnectionSourcePoint = activeConnection
+    ? positions.get(activeConnection.sourceId)
+    : undefined;
+  const activeConnectionTargetPoint = activeConnection
+    ? positions.get(activeConnection.targetId)
+    : undefined;
+  const activeTooltipPosition =
+    activeConnectionSourcePoint && activeConnectionTargetPoint
+      ? {
+          left: clamp(
+            (activeConnectionSourcePoint.x + activeConnectionTargetPoint.x) / 2,
+            18,
+            82,
+          ),
+          top: clamp(
+            (((activeConnectionSourcePoint.y + activeConnectionTargetPoint.y) / 2) /
+              62) *
+              100,
+            16,
+            84,
+          ),
+        }
+      : undefined;
 
   return (
     <div className="space-y-4">
@@ -192,30 +219,23 @@ export default function ContactGalaxy({
                   onMouseLeave={() => setActiveConnectionKey(null)}
                   onFocus={() => setActiveConnectionKey(key)}
                   onBlur={() => setActiveConnectionKey(null)}
-                  className="cursor-help outline-none"
+                  className="cursor-help stroke-transparent outline-none focus-visible:stroke-primary/20"
                 />
               </g>
             );
           })}
         </svg>
 
-        {activeConnection && activeConnectionSource && activeConnectionTarget ? (
+        {activeConnection &&
+        activeConnectionSource &&
+        activeConnectionTarget &&
+        activeTooltipPosition ? (
           <div
             role="tooltip"
             className="pointer-events-none absolute z-30 w-max max-w-72 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-primary/40 bg-popover px-3 py-2 text-center shadow-xl"
             style={{
-              left: `${
-                (positions.get(activeConnection.sourceId)!.x +
-                  positions.get(activeConnection.targetId)!.x) /
-                2
-              }%`,
-              top: `${
-                ((positions.get(activeConnection.sourceId)!.y +
-                  positions.get(activeConnection.targetId)!.y) /
-                  2 /
-                  62) *
-                100
-              }%`,
+              left: `${activeTooltipPosition.left}%`,
+              top: `${activeTooltipPosition.top}%`,
             }}
           >
             <p className="text-xs font-semibold text-foreground">
