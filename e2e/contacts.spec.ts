@@ -143,5 +143,32 @@ test.describe('Contacts', () => {
     await page.setViewportSize({ width: 375, height: 667 })
     await page.goto('/contacts')
     await expect(page.getByRole('heading', { level: 1, name: 'Contacts' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Galaxy' })).toBeVisible()
+    await expect(
+      page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', {
+        name: 'New contact',
+      }),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: /switch to light mode/i })).toBeVisible()
+    expect(
+      await page.getByRole('banner').evaluate((header) => header.scrollWidth <= header.clientWidth),
+    ).toBe(true)
+  })
+
+  test('mobile galaxy uses the collision-free compact network', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 })
+    await page.goto('/network')
+
+    await expect(page.getByRole('region', { name: 'Compact network' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Galaxy map' })).toBeHidden()
+  })
+
+  test('a galaxy edge reveals its exact relationship', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/network')
+
+    const edge = page.getByTestId(/^galaxy-edge-/).first()
+    await edge.hover()
+    await expect(page.getByRole('tooltip')).toContainText(/Shared location:/)
   })
 })
