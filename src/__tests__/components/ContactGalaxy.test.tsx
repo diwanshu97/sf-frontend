@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ContactGalaxy from "@/components/contacts/ContactGalaxy";
 import { makeContact } from "../mocks/handlers";
@@ -52,5 +52,36 @@ describe("ContactGalaxy", () => {
       ),
     ).toHaveLength(18);
     expect(screen.getByText("showing the first 18")).toBeInTheDocument();
+  });
+
+  it("identifies the exact relationship when an edge is hovered or focused", () => {
+    const contacts = [
+      makeContact({ id: 1, full_name: "Ada Lovelace" }),
+      makeContact({
+        id: 2,
+        first_name: "Grace",
+        last_name: "Hopper",
+        full_name: "Grace Hopper",
+      }),
+    ];
+    render(<ContactGalaxy contacts={contacts} total={contacts.length} />);
+
+    const edge = screen.getByTestId("galaxy-edge-1-2");
+    expect(edge).toHaveAccessibleName(
+      "Ada Lovelace and Grace Hopper are connected through San Francisco",
+    );
+
+    fireEvent.mouseEnter(edge);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Ada Lovelace ↔ Grace Hopper",
+    );
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Shared location: San Francisco",
+    );
+
+    fireEvent.mouseLeave(edge);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.focus(edge);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
 });

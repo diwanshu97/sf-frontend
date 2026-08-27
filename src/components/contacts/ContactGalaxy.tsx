@@ -7,6 +7,7 @@ import ContactAvatar from "@/components/contacts/ContactAvatar";
 import {
   galaxyConnections,
   galaxyPositions,
+  type GalaxyConnection,
   type GalaxyMode,
 } from "@/lib/contacts/galaxy";
 import type { Contact } from "@/lib/contacts/types";
@@ -15,6 +16,10 @@ const MODES: { value: GalaxyMode; label: string; icon: typeof Building2 }[] = [
   { value: "location", label: "Location", icon: MapPin },
   { value: "company", label: "Company", icon: Building2 },
 ];
+
+function connectionKey(connection: GalaxyConnection): string {
+  return `${connection.sourceId}-${connection.targetId}`;
+}
 
 export default function ContactGalaxy({
   contacts,
@@ -25,6 +30,7 @@ export default function ContactGalaxy({
 }) {
   const [mode, setMode] = useState<GalaxyMode>("location");
   const [activeContactId, setActiveContactId] = useState<number | null>(null);
+  const [activeConnectionKey, setActiveConnectionKey] = useState<string | null>(null);
   const positions = galaxyPositions(contacts);
   const connections = galaxyConnections(contacts, mode);
   const connectionNoun = connections.length === 1 ? "connection" : "connections";
@@ -41,6 +47,15 @@ export default function ContactGalaxy({
   ];
   const activeContact = contacts.find((contact) => contact.id === activeContactId);
   const activeReasons = activeContact ? reasonsFor(activeContact.id) : [];
+  const activeConnection = connections.find(
+    (connection) => connectionKey(connection) === activeConnectionKey,
+  );
+  const activeConnectionSource = activeConnection
+    ? contacts.find((contact) => contact.id === activeConnection.sourceId)
+    : undefined;
+  const activeConnectionTarget = activeConnection
+    ? contacts.find((contact) => contact.id === activeConnection.targetId)
+    : undefined;
 
   return (
     <div className="space-y-4">
@@ -65,7 +80,11 @@ export default function ContactGalaxy({
               key={value}
               type="button"
               aria-pressed={mode === value}
-              onClick={() => setMode(value)}
+              onClick={() => {
+                setMode(value);
+                setActiveContactId(null);
+                setActiveConnectionKey(null);
+              }}
               className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[13px] font-medium transition-colors ${
                 mode === value
                   ? "bg-primary text-primary-foreground"
@@ -122,7 +141,7 @@ export default function ContactGalaxy({
         ))}
 
         <svg
-          aria-hidden="true"
+          aria-label="Interactive contact relationships"
           viewBox="0 0 100 62"
           preserveAspectRatio="none"
           className="absolute inset-0 h-full w-full"
@@ -130,27 +149,83 @@ export default function ContactGalaxy({
           {connections.map((connection) => {
             const source = positions.get(connection.sourceId)!;
             const target = positions.get(connection.targetId)!;
+            const sourceContact = contacts.find(
+              (contact) => contact.id === connection.sourceId,
+            )!;
+            const targetContact = contacts.find(
+              (contact) => contact.id === connection.targetId,
+            )!;
+            const key = connectionKey(connection);
+            const active = key === activeConnectionKey;
             return (
-              <g key={`${connection.sourceId}-${connection.targetId}`}>
+              <g key={key}>
                 <line
                   x1={source.x}
                   y1={source.y}
                   x2={target.x}
                   y2={target.y}
-                  className="stroke-primary/45"
-                  strokeWidth="0.35"
+                  className={active ? "stroke-primary" : "stroke-primary/45"}
+                  strokeWidth={active ? "0.75" : "0.35"}
                   strokeDasharray="1 0.8"
+                  pointerEvents="none"
                 />
                 <circle
                   cx={(source.x + target.x) / 2}
                   cy={(source.y + target.y) / 2}
-                  r="0.8"
-                  className="fill-primary"
+                  r={active ? "1.15" : "0.8"}
+                  className={active ? "fill-primary" : "fill-primary/80"}
+                  pointerEvents="none"
+                />
+                <line
+                  data-testid={`galaxy-edge-${key}`}
+                  role="img"
+                  aria-label={`${sourceContact.full_name} and ${targetContact.full_name} are connected through ${connection.label}`}
+                  tabIndex={0}
+                  x1={source.x}
+                  y1={source.y}
+                  x2={target.x}
+                  y2={target.y}
+                  stroke="transparent"
+                  strokeWidth="4"
+                  pointerEvents="stroke"
+                  onMouseEnter={() => setActiveConnectionKey(key)}
+                  onMouseLeave={() => setActiveConnectionKey(null)}
+                  onFocus={() => setActiveConnectionKey(key)}
+                  onBlur={() => setActiveConnectionKey(null)}
+                  className="cursor-help outline-none"
                 />
               </g>
             );
           })}
         </svg>
+
+        {activeConnection && activeConnectionSource && activeConnectionTarget ? (
+          <div
+            role="tooltip"
+            className="pointer-events-none absolute z-30 w-max max-w-72 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-primary/40 bg-popover px-3 py-2 text-center shadow-xl"
+            style={{
+              left: `${
+                (positions.get(activeConnection.sourceId)!.x +
+                  positions.get(activeConnection.targetId)!.x) /
+                2
+              }%`,
+              top: `${
+                ((positions.get(activeConnection.sourceId)!.y +
+                  positions.get(activeConnection.targetId)!.y) /
+                  2 /
+                  62) *
+                100
+              }%`,
+            }}
+          >
+            <p className="text-xs font-semibold text-foreground">
+              {activeConnectionSource.full_name} ↔ {activeConnectionTarget.full_name}
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Shared {mode}: <span className="text-primary">{activeConnection.label}</span>
+            </p>
+          </div>
+        ) : null}
 
         {contacts.map((contact) => {
           const point = positions.get(contact.id)!;
@@ -200,7 +275,7 @@ export default function ContactGalaxy({
             <>
               <p className="text-sm font-semibold text-foreground">Explore a connection</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Hover or focus a person to reveal why they are connected.
+                Hover or focus a person or line to reveal the relationship.
               </p>
             </>
           )}

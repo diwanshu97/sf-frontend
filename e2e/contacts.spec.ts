@@ -162,4 +162,13 @@ test.describe('Contacts', () => {
     await expect(page.getByRole('region', { name: 'Compact network' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Galaxy map' })).toBeHidden()
   })
+
+  test('a galaxy edge reveals its exact relationship', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/network')
+
+    const edge = page.getByTestId(/^galaxy-edge-/).first()
+    await edge.hover()
+    await expect(page.getByRole('tooltip')).toContainText(/Shared location:/)
+  })
 })
